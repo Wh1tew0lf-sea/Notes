@@ -8,7 +8,7 @@
 
 
 
-## Notes
+# Notes
 
 Why Hard/Interesting ?
 
@@ -32,7 +32,9 @@ risc-v qemu machine
 
 
 
-# xv6: Reading chapter 1
+# After Class
+
+## Chapter 1 : Operating system interfaces
 
 An operating system manages and abstracts the low-level hardware.
 
@@ -136,43 +138,4 @@ file:
 ### 1.5 Real world
 
 现代基于 Unix 的操作系统并不遵循早期 Unix 将设备暴露为特殊文件的设计，比如刚才所说的控制台文件
-
-# Lab: Xv6 and Unix utilities 实验室：Xv6 和 Unix 实用程序
-
-This lab will familiarize you with xv6 and its system calls.
-
-### sleep
-
-```c
-if(argc<2){
-    fprintf(2,"Usage:Sleep fow a new sec...\n");
-    exit(-1);
-}
-sleep(atoi(argv[1]));
-exit(0);
-```
-
-### pingpong
-
-```c
-int p[2];
-  char buf[100];
-  pipe(p);
-
-  int pid = fork();
-  if (pid == 0) {//child
-    write(p[1], “ping”, 4);
-    printf(“Thread id %d: received ping\n”, getpid());
-  } 
-  else {//parent
-    wait(0);
-    read(p[0], buf, 4);
-    printf(“Thread id %d: received pong\n”, getpid());
-  }
-```
-
-### primes
-
-```c
-```
 

