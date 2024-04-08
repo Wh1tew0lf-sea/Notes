@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>$Title$</title>
+  <style>
+    .scrolling-text-container {
+      width: 100vw;
+      height: 5vh;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      background-color: red;
+    }
+    .scrolling-text{
+      position: absolute;
+      color: yellow;
+      font-size: 3vh;
+      animation: scrolling-animation 40s linear infinite;
+    }
+    @keyframes scrolling-animation {
+      0% {left: 100%;}
+      100% {left: -100%;}
+    }
+  </style>
+</head>
+<body>
+<div class="scrolling-text-container">
+  <div class="scrolling-text" id="scrollingText"></div>
+</div>
+<script>
+  function getTodayBirthday(year){
+    var content = "";
+    var options = {
+      url: "api.aspx",
+      type: "post",
+      data: {Papers: 'getPartyBirthdayList', ParentID: "1", Year: year},
+      dataType: 'json',
+      async: false,
+      success: function (data){
+        var Today = new Date();
+        var year = Today.getFullYear();
+        var month = Today.getMonth();
+        var day = Today.getDate();
+        if(data.state == 0){
+          dataobj = data.Data;
+          apidata = ""
+          for(var i = 0;i < dataobj.length; i++){
+            if(dataobj[i].AwardTime.split("-")[1] != month || dataobj[i].AwardTime.split("-")[2] != day)
+              continue;
+          }
+          apidata = apidata + dataobj[i].Name;
+        }
+        else{
+          console.log(data.Message);
+        }
+      },
+      error: function (){
+        console.log("fail")
+      }
+    }
+    $.ajax(options);
+    return content;
+  }
+  function init(){
+    var Today = new Date();
+    var year = Today.getFullYear();
+    var month = Today.getMonth();
+    var day = Today.getDate();
+    var contextdata = "";
+    for(var i = 1980; i<= year; ++i)
+      contextdata += getTodayBirthday(i);
+    $("#scrollingText").append("<p>" + contextdata + "</p>");
+  }
+  init();
+</script>
+</body>
+</html>

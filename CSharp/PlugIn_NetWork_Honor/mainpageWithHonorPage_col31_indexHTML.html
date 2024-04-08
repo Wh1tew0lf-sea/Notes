@@ -1,0 +1,35 @@
+<div class="syhead2 rycqh">
+    <h2 class="sh"><a  href="/Col/Col29/Index.html">荣誉窗</a></h2>
+    <h2><a  href="http://www.jw.wzs.zj/jzcm" target="_blank">警示台</a></h2>
+</div>
+<div class="cont active" id="index-honor">
+    
+</div>
+<script>
+    $ (function (){
+        var options = {
+            url: 'wzgaApi.aspx',
+            type: 'POST',
+            data: {Papers: 'getYear'},
+            dataType: 'json',
+            success: function (data){
+                if (data.State == 0){
+                    dataobj = data.Data;
+                    var str = '';
+                    for(var i=0;i<4;i++){
+                        str += '<div class="ry-list"><a href="/Col/Col29/index.html?Year=' + dataobj[i].Year + '" target="_blank">' + dataobj[i].Year + '年度</a></div>';
+                    }
+                    str += '<div class="ry-list" style="width: 100%;"><a href="/Col/Col29/index.html" target="_blank" style="font-size: 14px;float: right;font-weight: normal;width: auto;">更多>></a></div>';
+                    $("#index-honor").append(str);
+                }
+                else{
+                    console.log(data.Message);
+                }
+            },
+            error: function (){
+                console.log("失败");
+            }
+        }
+        $.ajax(options);
+    })
+</script>

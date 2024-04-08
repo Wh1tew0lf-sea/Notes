@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<head>
+    <meta charset='gbk'>
+    <title> demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .scrolling-text-container {
+            width: 100vw;
+            height: 5vh;
+            overflow: hidden;
+            white-space: nowrap;
+            position: relative;
+            background-color: red;
+        }
+
+        .scrolling-text {
+            position: absolute;
+            color: yellow;
+            font-size: 3vh;
+            animation: scrolling-animation 40s linear infinite;
+        }
+
+        @keyframes scrolling-animation {
+            0% {
+                left: 100%;
+            }
+            100% {
+                left: -100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class=scrolling-text-container>
+    <div class="scrolling-text" id="scrollingText"></div>
+</div>
+<script>
+    const apidata = "??????????? admin1,admin2";
+
+    //const characterPerSecond=3;
+    function init() {
+        var scrollingTextElement = document.getElementByld('scrollingText');
+        scrolling
+        TextElement.inner
+        Text = apidata;
+        var textWidth = scrollingTextElement.offsetWidth;
+        var screenWidth = window.innerWidth;
+        var animationDuration = textWidth / (100 * screenWidth / characterPerSecond);
+        //var animationDuration=textWidth/(screenWidth):
+        scrolling
+        TextElement.style.animation = animationDuration + "s";
+    }
+    init();
+</script>
+</body>
+</html>
