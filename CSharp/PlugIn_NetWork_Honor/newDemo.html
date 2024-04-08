@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        .scroll {
+            position: relative;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .scroll p {
+            position: absolute;
+            top: 50%;
+            -webkit-transform: translateY(-50%);
+            transform: translateY(-50%);
+            animation-duration: 20s;
+            animation-timing-function: linear;
+            animation-name: scrolling;
+            animation-iteration-count: infinite;
+        }
+        @keyframes scrolling {
+            0% {
+                left: 100%;
+            }
+            100% {
+                left: -100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="scroll">
+    <p>这是滚动字幕的例子。</p>
+</div>
+</body>
+</html>
